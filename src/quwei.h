@@ -27,6 +27,7 @@ public:
     void keyEvent(fcitx::KeyEvent &keyEvent);
     void setCode(int code);
     void updateUI();
+    // 清除 buffer，更新 UI
     void reset() {
         buffer_.clear();
         updateUI();

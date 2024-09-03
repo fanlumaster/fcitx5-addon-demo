@@ -45,14 +45,19 @@ static const std::array<fcitx::Key, 10> selectionKeys = {
 
 class QuweiCandidateWord : public fcitx::CandidateWord {
 public:
+    // 构造函数
     QuweiCandidateWord(QuweiEngine *engine, std::string text)
         : engine_(engine) {
         setText(fcitx::Text(std::move(text)));
     }
 
+    // 候选项被用户选中的时候条用
     void select(fcitx::InputContext *inputContext) const override {
+        // 上屏候选项，这里就是最终上屏的内容
         inputContext->commitString(text().toString());
+        // 取出 QuweiState，这里的一系列的转换很奇妙，有时间值得仔细品读
         auto state = inputContext->propertyFor(engine_->factory());
+        // 重置状态
         state->reset();
     }
 
@@ -120,8 +125,8 @@ private:
         for (int i = 0; i < 10; i++) { // 一共生成 10 个候选项
             // 因为我们是输入 3 个数字之后开始展示候选列表的，比如，输入了 334 之后，会显示 3341 3342 3343 3344 3345 3346 3347 3348 3349 3350 对应的汉字，分别是：辽 潦 了 撂 镣 廖 料 列 裂 烈，也就是 3341 及其之后的 9 个汉字，0 表示的其实是 3340 + 10
             auto code = code_ * 10 + (i + 1); 
-            auto qu = code / 100;
-            auto wei = code % 100;
+            auto qu = code / 100; // 取四位数的前两位(高两位)
+            auto wei = code % 100; // 取四位数的后两位(低两位)
 
             // Quwei to GB2312 (0xA0 + qu, 0xA0 + wei)
             // convert Quwei to GB2312: 
@@ -140,6 +145,7 @@ private:
             }
 
             size_t insize = 2, avail = FCITX_UTF8_MAX_LENGTH + 1;
+            // 类型推导，最终得出的类型是 char*
             std::remove_pointer_t<second_argument_type<decltype(&::iconv)>>
                 inbuf = in;
 
@@ -148,7 +154,8 @@ private:
             // 执行字符编码转换，把 inbuf 转换成 outbuf，这里的操作是把 GB18030 编码转换成 utf8 编码
             iconv(engine_->conv(), &inbuf, &insize, &outbuf, &avail);
             *outbuf = '\0'; // 补一个字符串的终止符
-            candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, out);
+            // 设置候选项列表的第 i 个选项
+            candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, out); // 包装一个 unique_ptr 出来
         }
     }
 
@@ -283,6 +290,7 @@ void QuweiState::updateUI() {
     auto &inputPanel = ic_->inputPanel(); // also need to track the initialization of ic_
     inputPanel.reset();
     if (buffer_.size() == 3) { // if already type 3 digits
+        // 已经输入了 3 个数字需要设置候选列表
         inputPanel.setCandidateList(std::make_unique<QuweiCandidateList>(
             engine_, ic_, buffer_.userInput()));
     }
