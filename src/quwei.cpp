@@ -15,6 +15,7 @@
 #include <quickphrase_public.h>
 #include <utility>
 
+// 未命名的命名空间(unnamed namespace)
 namespace {
 
 // Template to help resolve iconv parameter issue on BSD.
@@ -22,16 +23,19 @@ template <class T>
 struct function_traits;
 
 // partial specialization for function pointer
+// 一个特例化的模板，接受一个函数指针作为类型，是 c++14 的 partial specialization 特性
 template <class R, class... Args>
 struct function_traits<R (*)(Args...)> {
     using result_type = R;
     using argument_types = std::tuple<Args...>;
 };
 
+// 提取第二个参数的类型
 template <class T>
 using second_argument_type = typename std::tuple_element<
     1, typename function_traits<T>::argument_types>::type;
 
+// 10 个键，分别是数字键 1 2 3 4 5 6 7 8 9 0，注意，不是键盘的小数字区域
 static const std::array<fcitx::Key, 10> selectionKeys = {
     fcitx::Key{FcitxKey_1}, fcitx::Key{FcitxKey_2}, fcitx::Key{FcitxKey_3},
     fcitx::Key{FcitxKey_4}, fcitx::Key{FcitxKey_5}, fcitx::Key{FcitxKey_6},
@@ -113,8 +117,9 @@ public:
 private:
     // generate words corresponding to Quwei code
     void generate() {
-        for (int i = 0; i < 10; i++) {
-            auto code = code_ * 10 + (i + 1);
+        for (int i = 0; i < 10; i++) { // 一共生成 10 个候选项
+            // 因为我们是输入 3 个数字之后开始展示候选列表的，比如，输入了 334 之后，会显示 3341 3342 3343 3344 3345 3346 3347 3348 3349 3350 对应的汉字，分别是：辽 潦 了 撂 镣 廖 料 列 裂 烈，也就是 3341 及其之后的 9 个汉字，0 表示的其实是 3340 + 10
+            auto code = code_ * 10 + (i + 1); 
             auto qu = code / 100;
             auto wei = code % 100;
 
@@ -140,8 +145,9 @@ private:
 
             char out[FCITX_UTF8_MAX_LENGTH + 1];
             char *outbuf = out;
+            // 执行字符编码转换，把 inbuf 转换成 outbuf，这里的操作是把 GB18030 编码转换成 utf8 编码
             iconv(engine_->conv(), &inbuf, &insize, &outbuf, &avail);
-            *outbuf = '\0';
+            *outbuf = '\0'; // 补一个字符串的终止符
             candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, out);
         }
     }
@@ -292,11 +298,12 @@ void QuweiState::updateUI() {
     ic_->updatePreedit();
 }
 
+// 这里先让 QuweiState 吃上 QuweiEngine 和 InputContext 这两碗饭，那么，其底下的小兄弟，比如 QuweiCandidateWord、QuweiCandidateList 之流就都可以吃上饭了
 QuweiEngine::QuweiEngine(fcitx::Instance *instance)
     : instance_(instance), factory_([this](fcitx::InputContext &ic) {
           return new QuweiState(this, &ic);
       }) {
-    conv_ = iconv_open("UTF-8", "GB18030");
+    conv_ = iconv_open("UTF-8", "GB18030"); // 编码转换描述符
     if (conv_ == reinterpret_cast<iconv_t>(-1)) {
         throw std::runtime_error("Failed to create converter");
     }
