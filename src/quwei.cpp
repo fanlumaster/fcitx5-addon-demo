@@ -13,7 +13,9 @@
 #include <fcitx/userinterfacemanager.h>
 #include <punctuation_public.h>
 #include <quickphrase_public.h>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -48,6 +50,7 @@ public:
 
     void select(fcitx::InputContext *inputContext) const override {
         inputContext->commitString(text().toString());
+        // inputContext->commitString("fanyfull");
         auto state = inputContext->propertyFor(engine_->factory());
         state->reset();
     }
@@ -142,7 +145,8 @@ private:
             char *outbuf = out;
             iconv(engine_->conv(), &inbuf, &insize, &outbuf, &avail);
             *outbuf = '\0';
-            candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, out);
+            // candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, out);
+            candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, fanyCandi[i]);
         }
     }
 
@@ -150,6 +154,7 @@ private:
     fcitx::InputContext *ic_;
     fcitx::Text labels_[10];
     std::unique_ptr<QuweiCandidateWord> candidates_[10];
+    std::vector<std::string> fanyCandi = {"韵酒", "东教工", "集锦园", "喻园", "梧桐语", "百景园", "西华园", "东园", "绿园", "紫荆园"};
     int code_;
     int cursor_ = 0;
 };
@@ -157,13 +162,17 @@ private:
 } // namespace
 
 void QuweiState::keyEvent(fcitx::KeyEvent &event) {
+    // 如果候选列表不为空，那么，在键入数字键之后，就可以将候选项选中并且上屏了
     if (auto candidateList = ic_->inputPanel().candidateList()) {
+        // 数字键的情况
         int idx = event.key().keyListIndex(selectionKeys);
         if (idx >= 0 && idx < candidateList->size()) {
             event.accept();
             candidateList->candidate(idx).select(ic_);
             return;
         }
+        // 翻页键的情况
+        // 向前翻页
         if (event.key().checkKeyList(
                 engine_->instance()->globalConfig().defaultPrevPage())) {
             if (auto *pageable = candidateList->toPageable();
@@ -176,6 +185,7 @@ void QuweiState::keyEvent(fcitx::KeyEvent &event) {
             return event.filterAndAccept();
         }
 
+        // 向后翻页
         if (event.key().checkKeyList(
                 engine_->instance()->globalConfig().defaultNextPage())) {
             if (auto *pageable = candidateList->toPageable();
