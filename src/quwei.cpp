@@ -118,6 +118,7 @@ private:
     void generate() {
         for (int i = 0; i < 10; i++) {
             auto code = code_ * 10 + (i + 1);
+            // auto code = 334 * 10 + (i + 1);
             auto qu = code / 100;
             auto wei = code % 100;
 
@@ -145,8 +146,8 @@ private:
             char *outbuf = out;
             iconv(engine_->conv(), &inbuf, &insize, &outbuf, &avail);
             *outbuf = '\0';
-            // candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, out);
-            candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, fanyCandi[i]);
+            candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, out);
+            // candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, fanyCandi[i]);
         }
     }
 
