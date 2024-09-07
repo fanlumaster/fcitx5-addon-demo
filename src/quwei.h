@@ -25,7 +25,7 @@ public:
         : engine_(engine), ic_(ic) {}
 
     void keyEvent(fcitx::KeyEvent &keyEvent);
-    void setCode(int code);
+    void setCode(std::string code);
     void updateUI();
     void reset() {
         buffer_.clear();
