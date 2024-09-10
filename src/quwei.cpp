@@ -21,9 +21,7 @@
 
 namespace {
 
-bool checkAlpha(std::string s) {
-    return s.size() == 1 && isalpha(s[0]);
-}
+bool checkAlpha(std::string s) { return s.size() == 1 && isalpha(s[0]); }
 
 // Template to help resolve iconv parameter issue on BSD.
 template <class T> struct function_traits;
@@ -36,9 +34,8 @@ template <class R, class... Args> struct function_traits<R (*)(Args...)> {
 
 template <class T> using second_argument_type = typename std::tuple_element<1, typename function_traits<T>::argument_types>::type;
 
-static const std::array<fcitx::Key, 10> selectionKeys = {
-    fcitx::Key{FcitxKey_1}, fcitx::Key{FcitxKey_2}, fcitx::Key{FcitxKey_3}, fcitx::Key{FcitxKey_4}, fcitx::Key{FcitxKey_5}, fcitx::Key{FcitxKey_6}, fcitx::Key{FcitxKey_7}, fcitx::Key{FcitxKey_8}, fcitx::Key{FcitxKey_9}, fcitx::Key{FcitxKey_0},
-};
+static const std::array<fcitx::Key, 11> selectionKeys = {fcitx::Key{FcitxKey_1}, fcitx::Key{FcitxKey_2}, fcitx::Key{FcitxKey_3}, fcitx::Key{FcitxKey_4}, fcitx::Key{FcitxKey_5},    fcitx::Key{FcitxKey_6},
+                                                         fcitx::Key{FcitxKey_7}, fcitx::Key{FcitxKey_8}, fcitx::Key{FcitxKey_9}, fcitx::Key{FcitxKey_0}, fcitx::Key{FcitxKey_space}};
 
 class QuweiCandidateWord : public fcitx::CandidateWord {
   public:
@@ -137,7 +134,10 @@ void QuweiState::keyEvent(fcitx::KeyEvent &event) {
     if (auto candidateList = ic_->inputPanel().candidateList()) {
         // 数字键的情况
         int idx = event.key().keyListIndex(selectionKeys);
-        if (idx >= 0 && idx < candidateList->size()) {
+        if (idx == selectionKeys.size() - 1) {
+            idx = 0;
+        }
+        if (idx >= 0 && idx < candidateList->size() + 1) {
             event.accept();
             candidateList->candidate(idx).select(ic_);
             return;
@@ -163,7 +163,7 @@ void QuweiState::keyEvent(fcitx::KeyEvent &event) {
         }
     }
 
-    if (buffer_.empty()) {                  // current text buffer is empty
+    if (buffer_.empty()) {                                                // current text buffer is empty
         if (!checkAlpha(event.key().keySymToString(event.key().sym()))) { // current text is empty and not digit
             FCITX_INFO() << event.key().code() << " " << event.key().digit() << " " << event.key().sym() << " " << event.key().keySymToString(event.key().sym()) << " " << "first is right?";
             // if it gonna commit something
