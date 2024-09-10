@@ -54,8 +54,6 @@ class QuweiCandidateWord : public fcitx::CandidateWord {
 
 class QuweiCandidateList : public fcitx::CandidateList, public fcitx::PageableCandidateList, public fcitx::CursorMovableCandidateList {
   public:
-    DictionaryUlPb dict;
-
     QuweiCandidateList(QuweiEngine *engine, fcitx::InputContext *ic, const std::string &code) : engine_(engine), ic_(ic), code_(code) {
         setPageable(this);
         setCursorMovable(this);
@@ -113,8 +111,16 @@ class QuweiCandidateList : public fcitx::CandidateList, public fcitx::PageableCa
     void generate() {
         FCITX_INFO() << "fanywhat: " << code_;
         std::vector<std::string> candi_vec = dict.generate(code_);
-        for (int i = 0; i < 10; i++) {
-            candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, candi_vec[i]);
+        long unsigned int vec_size = candi_vec.size() > 10 ? 10 : candi_vec.size();
+        for (long unsigned int i = 0; i < 10; i++) {
+            if (i >= vec_size) {
+                FCITX_INFO() << i << " greater version: ";
+                candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, "what");
+            } else {
+                FCITX_INFO() << i << " han char test: " << candi_vec[i];
+                FCITX_INFO() << "less version: " << candi_vec[i];
+                candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, candi_vec[i]);
+            }
         }
     }
 
@@ -125,7 +131,10 @@ class QuweiCandidateList : public fcitx::CandidateList, public fcitx::PageableCa
     std::vector<std::string> fanyCandi = {"韵酒", "东教工", "集锦园", "喻园", "梧桐语", "百景园", "西华园", "东园", "绿园", "紫荆园"};
     std::string code_;
     int cursor_ = 0;
+    static DictionaryUlPb dict;
 };
+
+DictionaryUlPb QuweiCandidateList::dict = DictionaryUlPb();
 
 } // namespace
 
@@ -134,6 +143,7 @@ void QuweiState::keyEvent(fcitx::KeyEvent &event) {
     if (auto candidateList = ic_->inputPanel().candidateList()) {
         // 数字键的情况
         int idx = event.key().keyListIndex(selectionKeys);
+        // use space key to commit first candidate
         if (idx == selectionKeys.size() - 1) {
             idx = 0;
         }
@@ -240,7 +250,8 @@ void QuweiState::setCode(std::string code) {
 void QuweiState::updateUI() {
     auto &inputPanel = ic_->inputPanel(); // also need to track the initialization of ic_
     inputPanel.reset();
-    if (buffer_.size() == 2) { // if already type 3 digits
+    if (buffer_.size() > 0) { // if already type 3 digits
+        FCITX_INFO() << "when typing chars";
         inputPanel.setCandidateList(std::make_unique<QuweiCandidateList>(engine_, ic_, buffer_.userInput()));
     }
     if (ic_->capabilityFlags().test(fcitx::CapabilityFlag::Preedit)) {

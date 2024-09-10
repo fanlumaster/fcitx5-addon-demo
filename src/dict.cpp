@@ -1,5 +1,7 @@
 #include "dict.h"
 
+std::vector<std::string> DictionaryUlPb::alpha_list = {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"};
+
 DictionaryUlPb::DictionaryUlPb() {
     const char *homeDir = getenv("HOME");
     if (!homeDir) {
@@ -25,7 +27,15 @@ DictionaryUlPb::DictionaryUlPb() {
 
 std::vector<std::string> DictionaryUlPb::generate(const std::string code) {
     std::vector<std::string> candidateList;
-    candidateList = dict_map[code];
+    std::vector<std::string> code_list;
+    if (code.size() == 1) {
+        for (auto letter : alpha_list) {
+            code_list.push_back(code + letter);
+            candidateList.insert(candidateList.end(), dict_map[code + letter].begin(), dict_map[code + letter].end());
+        }
+    } else {
+        candidateList = dict_map[code];
+    }
     return candidateList;
 }
 
