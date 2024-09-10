@@ -21,6 +21,8 @@
 
 namespace {
 
+static int CANDIDATE_SIZE = 10;
+
 bool checkAlpha(std::string s) { return s.size() == 1 && isalpha(s[0]); }
 
 // Template to help resolve iconv parameter issue on BSD.
@@ -57,18 +59,18 @@ class QuweiCandidateList : public fcitx::CandidateList, public fcitx::PageableCa
     QuweiCandidateList(QuweiEngine *engine, fcitx::InputContext *ic, const std::string &code) : engine_(engine), ic_(ic), code_(code) {
         setPageable(this);
         setCursorMovable(this);
-        for (int i = 0; i < 10; i++) { // generate indices of candidate window
+        cand_size = generate(); // generate actually
+        for (int i = 0; i < cand_size; i++) {     // generate indices of candidate window
             const char label[2] = {static_cast<char>('0' + (i + 1) % 10), '\0'};
             labels_[i].append(label);
             labels_[i].append(". ");
         }
-        generate(); // generate actually
     }
 
     const fcitx::Text &label(int idx) const override { return labels_[idx]; }
 
     const fcitx::CandidateWord &candidate(int idx) const override { return *candidates_[idx]; }
-    int size() const override { return 10; }
+    int size() const override { return cand_size; }
     fcitx::CandidateLayoutHint layoutHint() const override { return fcitx::CandidateLayoutHint::NotSet; }
     bool usedNextBefore() const override { return false; }
     void prev() override {
@@ -108,20 +110,21 @@ class QuweiCandidateList : public fcitx::CandidateList, public fcitx::PageableCa
 
   private:
     // generate words corresponding to Quwei code
-    void generate() {
+    int generate() {
         FCITX_INFO() << "fanywhat: " << code_;
         std::vector<std::string> candi_vec = dict.generate(code_);
         long unsigned int vec_size = candi_vec.size() > 10 ? 10 : candi_vec.size();
         for (long unsigned int i = 0; i < 10; i++) {
             if (i >= vec_size) {
                 FCITX_INFO() << i << " greater version: ";
-                candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, "what");
+                // candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, "what");
             } else {
                 FCITX_INFO() << i << " han char test: " << candi_vec[i];
                 FCITX_INFO() << "less version: " << candi_vec[i];
                 candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, candi_vec[i]);
             }
         }
+        return vec_size;
     }
 
     QuweiEngine *engine_;
@@ -131,6 +134,7 @@ class QuweiCandidateList : public fcitx::CandidateList, public fcitx::PageableCa
     std::vector<std::string> fanyCandi = {"韵酒", "东教工", "集锦园", "喻园", "梧桐语", "百景园", "西华园", "东园", "绿园", "紫荆园"};
     std::string code_;
     int cursor_ = 0;
+    int cand_size = CANDIDATE_SIZE;
     static DictionaryUlPb dict;
 };
 
