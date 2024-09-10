@@ -5,6 +5,8 @@
  *
  */
 #include "quwei.h"
+#include "dict.h"
+#include <cctype>
 #include <fcitx-utils/i18n.h>
 #include <fcitx-utils/utf8.h>
 #include <fcitx/candidatelist.h>
@@ -16,12 +18,12 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include <unordered_map>
-#include <fstream>
 
 namespace {
 
-std::ifstream inputFile("~/.local/share/fcitx5-fanyime/word.txt");
+bool checkAlpha(std::string s) {
+    return s.size() == 1 && isalpha(s[0]);
+}
 
 // Template to help resolve iconv parameter issue on BSD.
 template <class T> struct function_traits;
@@ -55,6 +57,8 @@ class QuweiCandidateWord : public fcitx::CandidateWord {
 
 class QuweiCandidateList : public fcitx::CandidateList, public fcitx::PageableCandidateList, public fcitx::CursorMovableCandidateList {
   public:
+    DictionaryUlPb dict;
+
     QuweiCandidateList(QuweiEngine *engine, fcitx::InputContext *ic, const std::string &code) : engine_(engine), ic_(ic), code_(code) {
         setPageable(this);
         setCursorMovable(this);
@@ -110,8 +114,10 @@ class QuweiCandidateList : public fcitx::CandidateList, public fcitx::PageableCa
   private:
     // generate words corresponding to Quwei code
     void generate() {
+        FCITX_INFO() << "fanywhat: " << code_;
+        std::vector<std::string> candi_vec = dict.generate(code_);
         for (int i = 0; i < 10; i++) {
-            candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, fanyCandi[i]);
+            candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, candi_vec[i]);
         }
     }
 
@@ -157,8 +163,9 @@ void QuweiState::keyEvent(fcitx::KeyEvent &event) {
         }
     }
 
-    if (buffer_.empty()) {           // current text buffer is empty
-        if (event.key().isDigit()) { // current text is empty and not digit
+    if (buffer_.empty()) {                  // current text buffer is empty
+        if (!checkAlpha(event.key().keySymToString(event.key().sym()))) { // current text is empty and not digit
+            FCITX_INFO() << event.key().code() << " " << event.key().digit() << " " << event.key().sym() << " " << event.key().keySymToString(event.key().sym()) << " " << "first is right?";
             // if it gonna commit something
             auto c = fcitx::Key::keySymToUnicode(event.key().sym());
             if (!c) {
@@ -209,7 +216,9 @@ void QuweiState::keyEvent(fcitx::KeyEvent &event) {
             reset();
             return event.filterAndAccept();
         }
-        if (event.key().isDigit()) { // current text buffer is not empty, and current key pressed is not digit
+        if (!checkAlpha(event.key().keySymToString(event.key().sym()))) { // current text buffer is not empty, and current key pressed is not digit
+
+            FCITX_INFO() << event.key().code() << " " << event.key().digit() << " " << event.key().sym() << " " << "here is right?";
             return event.filterAndAccept();
         }
     }
@@ -231,7 +240,7 @@ void QuweiState::setCode(std::string code) {
 void QuweiState::updateUI() {
     auto &inputPanel = ic_->inputPanel(); // also need to track the initialization of ic_
     inputPanel.reset();
-    if (buffer_.size() == 3) { // if already type 3 digits
+    if (buffer_.size() == 2) { // if already type 3 digits
         inputPanel.setCandidateList(std::make_unique<QuweiCandidateList>(engine_, ic_, buffer_.userInput()));
     }
     if (ic_->capabilityFlags().test(fcitx::CapabilityFlag::Preedit)) {

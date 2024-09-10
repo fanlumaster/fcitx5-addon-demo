@@ -1,5 +1,5 @@
 # Make sure it produce quwei.so instead of libquwei.so
-add_library(quwei SHARED quwei.cpp)
+add_library(quwei SHARED quwei.cpp dict.cpp)
 target_link_libraries(quwei PRIVATE Fcitx5::Core Fcitx5::Module::Punctuation  Fcitx5::Module::QuickPhrase)
 install(TARGETS quwei DESTINATION "${FCITX_INSTALL_LIBDIR}/fcitx5")
 
