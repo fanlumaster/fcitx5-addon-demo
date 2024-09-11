@@ -19,7 +19,6 @@
 #include <utility>
 #include <vector>
 
-// 未命名的命名空间(unnamed namespace)
 namespace {
 
 static int CANDIDATE_SIZE = 10;
@@ -30,132 +29,116 @@ bool checkAlpha(std::string s) { return s.size() == 1 && isalpha(s[0]); }
 template <class T> struct function_traits;
 
 // partial specialization for function pointer
-// 一个特例化的模板，接受一个函数指针作为类型，是 c++14 的 partial specialization 特性
 template <class R, class... Args> struct function_traits<R (*)(Args...)> {
-    template <class R, class... Args> struct function_traits<R (*)(Args...)> {
-        using result_type = R;
-        using argument_types = std::tuple<Args...>;
-    };
+    using result_type = R;
+    using argument_types = std::tuple<Args...>;
+};
 
-    // 提取第二个参数的类型
-    template <class T> using second_argument_type = typename std::tuple_element<1, typename function_traits<T>::argument_types>::type;
-    template <class T> using second_argument_type = typename std::tuple_element<1, typename function_traits<T>::argument_types>::type;
+template <class T> using second_argument_type = typename std::tuple_element<1, typename function_traits<T>::argument_types>::type;
 
-    // 10 个键，分别是数字键 1 2 3 4 5 6 7 8 9 0，注意，不是键盘的小数字区域
-    static const std::array<fcitx::Key, 10> selectionKeys = {
-        fcitx::Key{FcitxKey_1}, fcitx::Key{FcitxKey_2}, fcitx::Key{FcitxKey_3}, fcitx::Key{FcitxKey_4}, fcitx::Key{FcitxKey_5}, fcitx::Key{FcitxKey_6}, fcitx::Key{FcitxKey_7}, fcitx::Key{FcitxKey_8}, fcitx::Key{FcitxKey_9}, fcitx::Key{FcitxKey_0},
-    };
-    static const std::array<fcitx::Key, 11> selectionKeys = {fcitx::Key{FcitxKey_1}, fcitx::Key{FcitxKey_2}, fcitx::Key{FcitxKey_3}, fcitx::Key{FcitxKey_4}, fcitx::Key{FcitxKey_5},    fcitx::Key{FcitxKey_6},
-                                                             fcitx::Key{FcitxKey_7}, fcitx::Key{FcitxKey_8}, fcitx::Key{FcitxKey_9}, fcitx::Key{FcitxKey_0}, fcitx::Key{FcitxKey_space}};
+static const std::array<fcitx::Key, 11> selectionKeys = {fcitx::Key{FcitxKey_1}, fcitx::Key{FcitxKey_2}, fcitx::Key{FcitxKey_3}, fcitx::Key{FcitxKey_4}, fcitx::Key{FcitxKey_5},    fcitx::Key{FcitxKey_6},
+                                                         fcitx::Key{FcitxKey_7}, fcitx::Key{FcitxKey_8}, fcitx::Key{FcitxKey_9}, fcitx::Key{FcitxKey_0}, fcitx::Key{FcitxKey_space}};
 
-    class QuweiCandidateWord : public fcitx::CandidateWord {
-      public:
-        // 构造函数
-        QuweiCandidateWord(QuweiEngine *engine, std::string text) : engine_(engine) { setText(fcitx::Text(std::move(text))); }
+class QuweiCandidateWord : public fcitx::CandidateWord {
+  public:
+    QuweiCandidateWord(QuweiEngine *engine, std::string text) : engine_(engine) { setText(fcitx::Text(std::move(text))); }
 
-      public:
-        QuweiCandidateWord(QuweiEngine *engine, std::string text) : engine_(engine) { setText(fcitx::Text(std::move(text))); }
+    void select(fcitx::InputContext *inputContext) const override {
+        inputContext->commitString(text().toString());
+        // inputContext->commitString("fanyfull");
+        auto state = inputContext->propertyFor(engine_->factory());
+        state->reset();
+    }
 
-        // 候选项被用户选中的时候条用
-        void select(fcitx::InputContext *inputContext) const override {
-            // 上屏候选项，这里就是最终上屏的内容
-            inputContext->commitString(text().toString());
-            // 取出 QuweiState，这里的一系列的转换很奇妙，有时间值得仔细品读
-            // inputContext->commitString("fanyfull");
-            auto state = inputContext->propertyFor(engine_->factory());
-            // 重置状态
-            state->reset();
+  private:
+    QuweiEngine *engine_;
+};
+
+class QuweiCandidateList : public fcitx::CandidateList, public fcitx::PageableCandidateList, public fcitx::CursorMovableCandidateList {
+  public:
+    QuweiCandidateList(QuweiEngine *engine, fcitx::InputContext *ic, const std::string &code) : engine_(engine), ic_(ic), code_(code) {
+        setPageable(this);
+        setCursorMovable(this);
+        cand_size = generate(); // generate actually
+        for (int i = 0; i < cand_size; i++) {     // generate indices of candidate window
+            const char label[2] = {static_cast<char>('0' + (i + 1) % 10), '\0'};
+            labels_[i].append(label);
+            labels_[i].append(". ");
         }
+    }
 
-      private:
-        QuweiEngine *engine_;
-    };
+    const fcitx::Text &label(int idx) const override { return labels_[idx]; }
 
-    class QuweiCandidateList : public fcitx::CandidateList, public fcitx::PageableCandidateList, public fcitx::CursorMovableCandidateList {
-      public:
-        QuweiCandidateList(QuweiEngine *engine, fcitx::InputContext *ic, const std::string &code) : engine_(engine), ic_(ic), code_(code) {
-            setPageable(this);
-            setCursorMovable(this);
-            cand_size = generate();               // generate actually
-            for (int i = 0; i < cand_size; i++) { // generate indices of candidate window
-                const char label[2] = {static_cast<char>('0' + (i + 1) % 10), '\0'};
-                labels_[i].append(label);
-                labels_[i].append(". ");
+    const fcitx::CandidateWord &candidate(int idx) const override { return *candidates_[idx]; }
+    int size() const override { return cand_size; }
+    fcitx::CandidateLayoutHint layoutHint() const override { return fcitx::CandidateLayoutHint::NotSet; }
+    bool usedNextBefore() const override { return false; }
+    void prev() override {
+        if (!hasPrev()) {
+            return;
+        }
+        // TODO: 重写
+        // --code_;
+        auto state = ic_->propertyFor(engine_->factory());
+        state->setCode(code_);
+    }
+    void next() override {
+        if (!hasNext()) {
+            return;
+        }
+        // TODO: 重写
+        // code_++;
+        auto state = ic_->propertyFor(engine_->factory());
+        state->setCode(code_);
+    }
+
+    bool hasPrev() const override {
+        // TODO: 重写
+        return false;
+    }
+
+    bool hasNext() const override {
+        // TODO: 重写
+        return false;
+    }
+
+    void prevCandidate() override { cursor_ = (cursor_ + 9) % 10; }
+
+    void nextCandidate() override { cursor_ = (cursor_ + 1) % 10; }
+
+    int cursorIndex() const override { return cursor_; }
+
+  private:
+    // generate words corresponding to Quwei code
+    int generate() {
+        FCITX_INFO() << "fanywhat: " << code_;
+        std::vector<std::string> candi_vec = dict.generate(code_);
+        long unsigned int vec_size = candi_vec.size() > 10 ? 10 : candi_vec.size();
+        for (long unsigned int i = 0; i < 10; i++) {
+            if (i >= vec_size) {
+                FCITX_INFO() << i << " greater version: ";
+                // candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, "what");
+            } else {
+                FCITX_INFO() << i << " han char test: " << candi_vec[i];
+                FCITX_INFO() << "less version: " << candi_vec[i];
+                candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, candi_vec[i]);
             }
         }
+        return vec_size;
+    }
 
-        const fcitx::Text &label(int idx) const override { return labels_[idx]; }
+    QuweiEngine *engine_;
+    fcitx::InputContext *ic_;
+    fcitx::Text labels_[10];
+    std::unique_ptr<QuweiCandidateWord> candidates_[10];
+    std::vector<std::string> fanyCandi = {"韵酒", "东教工", "集锦园", "喻园", "梧桐语", "百景园", "西华园", "东园", "绿园", "紫荆园"};
+    std::string code_;
+    int cursor_ = 0;
+    int cand_size = CANDIDATE_SIZE;
+    static DictionaryUlPb dict;
+};
 
-        const fcitx::CandidateWord &candidate(int idx) const override { return *candidates_[idx]; }
-        int size() const override { return cand_size; }
-        fcitx::CandidateLayoutHint layoutHint() const override { return fcitx::CandidateLayoutHint::NotSet; }
-        bool usedNextBefore() const override { return false; }
-        void prev() override {
-            if (!hasPrev()) {
-                return;
-            }
-            // TODO: 重写
-            // --code_;
-            auto state = ic_->propertyFor(engine_->factory());
-            state->setCode(code_);
-        }
-        void next() override {
-            if (!hasNext()) {
-                return;
-            }
-            // TODO: 重写
-            // code_++;
-            auto state = ic_->propertyFor(engine_->factory());
-            state->setCode(code_);
-        }
-
-        bool hasPrev() const override {
-            // TODO: 重写
-            return false;
-        }
-
-        bool hasNext() const override {
-            // TODO: 重写
-            return false;
-        }
-
-        void prevCandidate() override { cursor_ = (cursor_ + 9) % 10; }
-
-        void nextCandidate() override { cursor_ = (cursor_ + 1) % 10; }
-
-        int cursorIndex() const override { return cursor_; }
-
-      private:
-        // generate words corresponding to Quwei code
-        int generate() {
-            FCITX_INFO() << "fanywhat: " << code_;
-            std::vector<std::string> candi_vec = dict.generate(code_);
-            long unsigned int vec_size = candi_vec.size() > 10 ? 10 : candi_vec.size();
-            for (long unsigned int i = 0; i < 10; i++) {
-                if (i >= vec_size) {
-                    FCITX_INFO() << i << " greater version: ";
-                    // candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, "what");
-                } else {
-                    FCITX_INFO() << i << " han char test: " << candi_vec[i];
-                    FCITX_INFO() << "less version: " << candi_vec[i];
-                    candidates_[i] = std::make_unique<QuweiCandidateWord>(engine_, candi_vec[i]);
-                }
-            }
-            return vec_size;
-        }
-
-        QuweiEngine *engine_;
-        fcitx::InputContext *ic_;
-        fcitx::Text labels_[10];
-        std::unique_ptr<QuweiCandidateWord> candidates_[10];
-        std::vector<std::string> fanyCandi = {"韵酒", "东教工", "集锦园", "喻园", "梧桐语", "百景园", "西华园", "东园", "绿园", "紫荆园"};
-        std::string code_;
-        int cursor_ = 0;
-        int cand_size = CANDIDATE_SIZE;
-        static DictionaryUlPb dict;
-    };
-
-    DictionaryUlPb QuweiCandidateList::dict = DictionaryUlPb();
+DictionaryUlPb QuweiCandidateList::dict = DictionaryUlPb();
 
 } // namespace
 
